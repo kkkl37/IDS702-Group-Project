@@ -41,7 +41,7 @@ library(ggcorrplot)
 
 
 ```{r setup, include=FALSE}
-data = read_xpt('LLCP2021.XPT ')
+data = read_xpt('LLCP2021.XPT')
 ```
 
 Primary relationship of interest: Present descriptive statistics and exploratory plots in whichever format you think is best (tables, figures) for your primary relationship of interest (dependent variable and primary independent variable, if applicable). Describe your findings. 
