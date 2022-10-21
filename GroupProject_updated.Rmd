@@ -1,0 +1,351 @@
+---
+title: "Group Project"
+author: "Ruixin Lou, Chloe Liu, Paul McKee, Kristi Van Meter"
+date: "`r Sys.Date()`"
+header-includes:
+   - \usepackage{dcolumn}
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    self_contained: yes
+    code_folding: hide
+    code_download: yes
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+---
+\newpage
+# Data Overview
+
+This report uses data provided by the Behavioral Risk Factor Surveillance System (BRFSS). The BRFSS data examined here is from the 2021 annual survey conducted by the Centers for Disease Control and Prevention (CDC). The goal of the BRFSS is to collect state-specific data on chronic diseases and conditions, access to health care, health risk behaviors, and the use of preventive health services associated with the leading causes of death and disability within the US. As such, there is information on chronic health conditions, tobacco use, fruit and vegetable consumption, health care access, hypertension and cholesterol awareness, exercise habits, health status and number of healthy data, and arthritis status. The data outlined in the following report comes from 49 states, Washington D.C., Guam, Puerto Rico, and the US Virgin Islands. After being unable to collect BRFSS data over enough months to satisfy the requirements for inclusion in this 2021 dataset, Florida was excluded. All data was self-reported through interviews on the telephone. Thus, with this dataset of 303 features for 438,693 people we investigate two research questions: 1) How well do exercise habits and medical history predict the number of poor mental health days during a 30 day period?, and 2) What are the relationships between different demographics (e.g., race, age, gender, socioeconomic status, etc.) and the likelihood of being diagnosed with diabetes?
+
+# Primary relationship of interest:
+
+```{r global options, include = FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+library(kableExtra)
+library(gridExtra)
+library(equatiomatic)
+library(sjPlot)
+library(ggfortify)
+library(stargazer)
+library(caret)
+library(table1)
+library(ggcorrplot)
+```
+
+
+```{r setup, include=FALSE}
+data = read_xpt('LLCP2021.XPT ')
+```
+
+
+## Research Question 1: How do exercise habits and medical history predict the number of days mental health was not good in the past 30 days?
+
+For research question one, we decided to perform multiple linear regression to predict mental health. We have included age, sex, personal health care provider, exercise, arthritis, diabetes, asthma as independent variables.
+
+```{r}
+q1 = data%>%select('_AGE80',BIRTHSEX,PERSDOC3,EXERANY2,HAVARTH5,DIABETE4,ASTHMA3,MENTHLTH)
+```
+
+**Rename Columns**
+
+```{r}
+old_names = colnames(q1)
+new_names = c("age","gender","persdoc","exercise","arthritis","diabetes","asthma","mental")
+# overwrite the old names with the new names:
+colnames(q1) = new_names
+questions = c("Imputed Age value collapsed above 80","What was your sex at birth? Was it male or female?","Do you have one person (or a group of doctors) that you think of as your personal health care provider?","During the past month, other than your regular job, did you participate in any physical activities or exercises
+such as running, calisthenics, golf, gardening, or walking for exercise?","Has a doctor, nurse or other health professional ever told you that you had some form of arthritis, rheumatoid arthritis, gout, lupus, or fibromyalgia? (Arthritis diagnoses include: rheumatism, polymyalgia rheumatic, osteoarthritis (not osteoporosis), tendonitis, bursitis, bunion, tennis elbow, carpal tunnel syndrome, tarsal tunnel syndrome, joint infection, Reiter’s syndrome, ankylosing spondylitis;)","(Ever told) (you had) diabetes? (If ´Yes´ and respondent is female, ask ´Was this only when you were pregnant?´. If Respondent says pre-diabetes or borderline diabetes, use response code 4.) ","(Ever told) (you had) asthma?","Now thinking about your mental health, which includes stress, depression, and problems with emotions, for
+how many days during the past 30 days was your mental health not good?")
+name_combo = bind_cols(New = new_names, Old = old_names,Questions = questions)
+name_combo %>% gt::gt()%>% gt::gtsave("tab_1.png", expand = 10)
+```
+
+
+**Data Cleaning**
+
+For gender, diabetes, arthritis and persdoc, we colappsed the "Don’t know/Not Sure" with "Refused" to make them 'Unkown'. For exercise, we decided to delete entries with "Don’t know/Not Sure" with "Refused" since this is our primary interested independent variable. As for mental health column, we filtered out all entries that in between 1-30, which are useful answers.
+
+```{r}
+q1_clean = q1%>%
+  mutate(
+    gender = case_when(
+      gender == 7 ~ 3,
+      gender == 9 ~ 3,
+      TRUE ~ gender
+    ),
+    diabetes = case_when(
+      diabetes == 7 ~ 9,
+      TRUE ~ diabetes
+    ),
+    arthritis = case_when(
+      arthritis == 7 ~ 9,
+      TRUE ~ arthritis
+    ),
+    persdoc = case_when(
+      persdoc == 7 ~ 9,
+      TRUE ~ persdoc
+    )
+  )%>%
+  filter(mental <= 30 & !is.na(gender) & exercise!=7 & exercise != 9 & !is.na(exercise))
+```
+
+```{r}
+q1_clean$gender <- factor(q1_clean$gender,
+                        levels=c(1,2,3), #how it is coded in the current dataset
+                        labels = c('Male','Female','Unkown') #give it new names
+)
+
+q1_clean$persdoc <- factor(q1_clean$persdoc,
+                        levels=c(1,2,3,9), #how it is coded in the current dataset
+                        labels = c('only one','More than one','No','Unknown') #give it new names
+) 
+
+q1_clean$exercise <- factor(q1_clean$exercise,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+)
+
+q1_clean$arthritis <- factor(q1_clean$arthritis,
+                        levels=c(1,2,9), #how it is coded in the current dataset
+                        labels = c('Yes','No','Unknown') #give it new names
+) 
+
+q1_clean$diabetes <- factor(q1_clean$diabetes,
+                        levels=c(1,2,3,4,9), #how it is coded in the current dataset
+                        labels = c('Yes','Yes,during pregnancy','No','No, pre-diabetes or borderline diabetes','Unknown') #give it new names
+) 
+
+q1_clean$asthma <- factor(q1_clean$asthma,
+                        levels=c(1,2,9), #how it is coded in the current dataset
+                        labels = c('Yes','No','Unknown') #give it new names
+) 
+```
+
+**Mental Health Distribution**
+
+```{r fig.height= 2}
+ggplot(q1_clean, aes(x = mental)) +
+  geom_histogram(fill = "steelblue") +
+  labs(title = "Histogram of Number of Days Dring the past 30 Days Mental Health was not Good", y = "Frequency", x = "Days") +
+  theme_classic(base_size = 10, base_line_size = 1) +
+  theme(plot.title = element_text(hjust = 1)) +
+  scale_x_continuous(
+    breaks = scales::pretty_breaks(n = 8), #add axis ticks for every data point
+    expand = c(0,0)) #remove the gap between the plot and the y-axis
+```
+
+Generally speaking, most of people experience less than or equal to 10 bad mental health days during the past 30. There is an interesting trend that it seems that people are intend to choose days which is divisible by 5. This is especially obvious when they report days greater than 10 days. It is noteworthy that we can observe a significantly high frequency of 30 days, which means there are a significant amount of people whose mental health was not good for the whole month.
+
+**Mental Health by Gender**
+
+```{r fig.height= 2}
+# Boxplot (Figure Xc)
+p1 = ggplot(q1_clean, aes(x=gender, y=mental, fill=gender)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="Gender", y="Mental Health")
+
+#Density plot (Figure Xd)
+p2 = ggplot(q1_clean,aes(x=mental, fill=gender)) + 
+  geom_density(bw=5, alpha=0.5) +
+  labs(x="Mental Health", y="Density") + 
+  theme_bw() 
+grid.arrange(p1, p2, ncol=2)
+```
+The difference of mental health between gender seems minor. The distribution between gender groups seems basically equal but female group has a higher mean of number of days dring the past 30 days mental health was not good. However, for the unknown group, they have significantly higher mean and median days during the past 30 days mental health was not good.
+
+**Mental Health by Exercise**
+
+```{r fig.height= 2}
+# Boxplot (Figure Xc)
+p1 = ggplot(q1_clean, aes(x=exercise, y=mental, fill=exercise)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="", y="Mental Health")
+
+#Density plot (Figure Xd)
+p2 = ggplot(q1_clean,aes(x=mental, fill=exercise)) + 
+  geom_density(bw=5, alpha=0.5) +
+  labs(x="Mental Health", y="Density",fill = 'excercise') + 
+  theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+Based on the two boxplots, we can see that for people who do participated in any physical activities during the past month, they tend to have lower amount of days during the past 30 days mental health was not good than those who didn't.
+
+**Mental Health by Personal Health Care Provider**
+
+```{r fig.height= 2}
+# Boxplot (Figure Xc)
+p1 = ggplot(q1_clean, aes(x=persdoc, y=mental, fill=persdoc)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x=" Personal Health Care Provider", y="Mental Health")+
+  theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+#Density plot (Figure Xd)
+p2 = ggplot(q1_clean,aes(x=mental, fill=persdoc)) + 
+  geom_density(bw=5, alpha=0.5) +
+  labs(x="Mental Health", y="Density") + 
+  theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+From the plots above, people who have only one personal health care provider seems to have better mental health. But the distributions of more than one personal health care provider and no personal health care provider are the same. For the Unknown personal health care provider group, the range is significantly larger with a higher median. 
+
+```{r echo = FALSE,fig.cap="Table 1. Smoke vs. Other variables"}
+# table1(~ mental + age + gender + persdoc + exercise |asthma, data=q1_clean)
+```
+
+```{r echo = FALSE}
+# table1(~ mental + age + gender + persdoc + exercise |asthma, data=q1_clean)
+```
+
+
+```{r echo = FALSE}
+# table1(~ mental + age + gender + persdoc + exercise |arthritis, data=q1_clean)
+```
+
+## Research Question 2: How do demographic categories impact likelihood of diabetes diagnosis?
+
+For research question one, we decided to build a logistic regression model to predict whether one have diabetes. We have included race, sex, age, general health, physical health, mental health, poor health as independent variables.
+
+
+```{r}
+q2 = data%>%select('_AGE80',BIRTHSEX,GENHLTH,PHYSHLTH,MENTHLTH,DIABETE4,POORHLTH,'_IMPRACE')
+```
+
+**Rename Columns**
+
+```{r}
+old_names = colnames(q2)
+new_names = c("age","gender","general_health","physical_health","mental","diabetes","poor_health",'race')
+# overwrite the old names with the new names:
+colnames(q2) = new_names
+questions = c("Imputed Age value collapsed above 80","What was your sex at birth? Was it male or female?","Would you say that in general your health is:","Now thinking about your physical health, which includes physical illness and injury, for how many days during the past 30 days was your physical health not good? ","Now thinking about your mental health, which includes stress, depression, and problems with emotions, for how many days during the past 30 days was your mental health not good?","(Ever told) (you had) diabetes? (If ´Yes´ and respondent is female, ask ´Was this only when you were pregnant?´. If Respondent says pre-diabetes or borderline diabetes, use response code 4.)","During the past 30 days, for about how many days did poor physical or mental health keep you from doing your usual activities, such as self-care, work, or recreation?","Imputed race/ethnicity value (This value is the reported race/ethnicity or an imputed race/ethnicity, if the respondent refused to give a race/ethnicity. The value of the imputed race/ethnicity will be the most common race/ethnicity response for that region of the state)")
+name_combo = bind_cols(New = new_names, Old = old_names,Questions = questions)
+name_combo %>% gt::gt()%>% gt::gtsave("tab_2.png", expand = 10)
+```
+
+
+**Data Cleaning**
+
+Collapsed the "Don’t know/Not Sure" with "Refused" to make them 'Unkown'. For physical health and poor_health, we only filtered out answers within the range of (1,30), since they are more meaningful and informative.
+
+For gender, we decided to delete entries with "Don’t know/Not Sure" with "Refused" since this is our primary interested independent variable. As for mental health column, we filtered out all entries that in between 1-30, which are useful answers.
+
+```{r}
+q2_clean = q2%>%
+  mutate(
+    diabetes = case_when(
+      diabetes == 7 ~ 9,
+      TRUE ~ diabetes
+    ),
+    general_health = case_when(
+      general_health == 7 ~ 9,
+      TRUE ~ general_health
+    ),
+    physical_health = case_when(
+      physical_health > 30 ~ NA_real_,
+      TRUE ~ physical_health
+    ),
+    poor_health= case_when(
+      poor_health > 30 ~ NA_real_,
+      TRUE ~ poor_health
+    ),
+  )%>%
+  filter(mental <= 30 & !is.na(gender) & gender!=7 & gender != 9 & !is.na(diabetes) & !is.na(general_health) &!is.na(poor_health)& !is.na(physical_health))
+```
+
+
+
+```{r}
+q2_clean$gender <- factor(q2_clean$gender,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Male','Female') #give it new names
+)
+
+q2_clean$general_health <- factor(q2_clean$general_health,
+                        levels=c(1:5,9), #how it is coded in the current dataset
+                        labels = c('Excellent','Very good','Good','Fair','Poor','Unknown') #give it new names
+) 
+
+q2_clean$diabetes <- factor(q2_clean$diabetes,
+                        levels=c(1,2,3,4,9), #how it is coded in the current dataset
+                        labels = c('Yes','Yes,during pregnancy','No','No, pre-diabetes or borderline diabetes','Unkown'),
+q2_clean$race <- factor(q2_clean$race,
+                        levels=c(1:6), #how it is coded in the current dataset
+                        labels = c('White','Black','Asian','American Indian/Alaskan Native','Hispanic','Other race'))
+) 
+```
+
+**Diabetes v.s. Age**
+
+```{r fig.height= 2}
+q2_clean %>%
+    ggplot() + aes(x = age, y = diabetes, fill = diabetes) +
+    geom_boxplot() + scale_fill_brewer(palette = "Paired") + labs(x = "Age", y = "Diabetes") + theme_bw() + theme(legend.position = "none")
+```
+
+Most people diagnosed with diabetes and has been told pre-diabetes/borderline diabetes have a higher age. Women have diabetes during pragnancy have younger age which makes sense since women's childbearing age is between 12 and 51.
+
+
+**Diabetes v.s. Gender**
+
+```{r fig.height= 4,fig.width=10}
+p1 = ggplot(q2_clean) +
+    aes(x = diabetes, fill = gender) +
+  labs(x = "Diabetes", fill = "Gender", y= "Proportion") + geom_bar(position = 'fill') + scale_fill_brewer(palette = "Paired")+ theme(axis.text.x = element_text(angle = 45,hjust=1))
+p2 = ggplot(q2_clean) +
+    aes(x = diabetes, fill = race) +
+  labs(x = "Diabetes", fill = "Race", y= "Proportion") + geom_bar(position = 'fill') + scale_fill_brewer(palette = "Paired")+ theme(axis.text.x = element_text(angle = 45,hjust=1))
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+The gender difference in having diabetes or not is not clear. For all the groups, female account for larger proportion. One thing we can be sure about is that diabetes data with 'Yes, during pregnancy' is all female, which mean there is nothing off.
+
+**Diabetes v.s. Race**
+
+In this sample, white people account for the largest proportions which indicates this sample is not too balanced. The relationship between race and diabetes seems minor. But it is noteworthy that Hispanic women seems to have more likely to have diabetes during pregnancy comparing with other groups.
+
+```{r, include = FALSE}
+p1 = ggplot(q2_clean,aes(x=mental, fill=diabetes,group = diabetes)) + 
+  geom_density(bw=5, alpha=0.5) +
+  labs(x="Days Mental Health was not Good", y="Density",fill = 'diabetes') + 
+  theme_bw()
+
+p2 = ggplot(q2_clean,aes(x=physical_health, fill=diabetes,group = diabetes)) + 
+  geom_density(bw=5, alpha=0.5) +
+  labs(x="Days Physical Health was not Good", y="Density",fill = 'diabetes') + 
+  theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+
+```{r}
+table1(~ physical_health +mental + poor_health + general_health |diabetes, data=q2_clean)
+```
+
+From the table above, we can observe that people who didn't suffered from diabetes tend to have a better health condition overall. It is interesting that for people have diabetes during pregnancy have less days of bad physical health,mental health and poor health over all comparing with no-diabetes group. 
+
+# Other characteristics
+
+# Potential challenges
+
+One challenge we are facing is that there are a lot of categorical variables in our predictor variables. For example, in our multiple linear regression model, age, sex, whether have personal healthcare provider, whether exercise in past 30 days, and some other health related variables are all categorical. The situation is the same in our second research question, which uses logistic regression. When doing exploratory data analysis, if we want to come up with some fancy plots, it is hard to use categorical variables to generate the plot we want. There is also a limitation on statistical analysis, as the numbers in categorical data do not have mathematical meaning. We can neither add them together nor subtract them from each other. Therefore, our team may have to expand more time on interpreting the results. In addition, there are many missing values, the answer of don’t know/not sure, and the answer of refuse in our data. We have to clean these kinds of data first and analyze them, which adds a lot of work for our team.
+
