@@ -1,8 +1,19 @@
 ---
+title: "Group Project"
+author: "Ruixin Lou, Chloe Liu, Paul McKee, Kristi Van Meter"
+date: "`r Sys.Date()`"
+header-includes:
+   - \usepackage{dcolumn}
 output:
-  pdf_document: default
-  html_document: default
-  word_document: default
+  pdf_document:
+    toc: yes
+  html_document:
+    self_contained: yes
+    code_folding: hide
+    code_download: yes
+    toc: yes
+    toc_float: yes
+    number_sections: yes
 ---
 \newpage
 # Data Overview
@@ -34,7 +45,7 @@ library(ggcorrplot)
 
 
 ```{r setup, include=FALSE}
-data = read_xpt('/Users/louruixin/Downloads/LLCP2021.XPT ')
+data = read_xpt('LLCP2021.XPT ')
 ```
 
 
@@ -46,7 +57,7 @@ For research question one, we decided to perform multiple linear regression to p
 q1 = data%>%select('_AGE80',BIRTHSEX,PERSDOC3,EXERANY2,HAVARTH5,DIABETE4,ASTHMA3,MENTHLTH)
 ```
 
-
+**Rename Columns**
 
 ```{r}
 old_names = colnames(q1)
@@ -217,7 +228,7 @@ For research question one, we decided to build a logistic regression model to pr
 q2 = data%>%select('_AGE80',BIRTHSEX,GENHLTH,PHYSHLTH,MENTHLTH,DIABETE4,POORHLTH,'_IMPRACE')
 ```
 
-
+**Rename Columns**
 
 ```{r}
 old_names = colnames(q2)
@@ -311,24 +322,8 @@ The gender difference in having diabetes or not is not clear. For all the groups
 
 In this sample, white people account for the largest proportions which indicates this sample is not too balanced. The relationship between race and diabetes seems minor. But it is noteworthy that Hispanic women seems to have more likely to have diabetes during pregnancy comparing with other groups.
 
-```{r 2}
-p1 = ggplot(q2_clean,aes(x=mental, fill=diabetes,group = diabetes)) + 
-  geom_density(bw=5, alpha=0.5) +
-  labs(x="Days Mental Health was not Good", y="Density",fill = 'diabetes') + 
-  theme_bw()
-
-p2 = ggplot(q2_clean,aes(x=physical_health, fill=diabetes,group = diabetes)) + 
-  geom_density(bw=5, alpha=0.5) +
-  labs(x="Days Physical Health was not Good", y="Density",fill = 'diabetes') + 
-  theme_bw()
-
-grid.arrange(p1, p2, ncol=1)
-```
-
-
 ```{r}
 q2_clean$diabetes <- factor(q2_clean$diabetes, levels=c('Yes','Yes,during pregnancy','No','No, pre-diabetes or borderline diabetes','Unkown'), labels=c('Yes','pregnant','No','pre-dia','Unknown'))
-
 table1(~ physical_health +mental + poor_health + general_health |diabetes, data=q2_clean, overall = F)
 ```
 
