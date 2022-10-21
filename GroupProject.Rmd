@@ -41,7 +41,7 @@ library(ggcorrplot)
 
 
 ```{r setup, include=FALSE}
-data = read_xpt('LLCP2021.XPT')
+data = read_xpt('LLCP2021.XPT ')
 ```
 
 Primary relationship of interest: Present descriptive statistics and exploratory plots in whichever format you think is best (tables, figures) for your primary relationship of interest (dependent variable and primary independent variable, if applicable). Describe your findings. 
@@ -74,7 +74,7 @@ name_combo %>% gt::gt()
 
 Data Cleaning
 
-For gender, diabetes, arthritis and persdoc, we colappsed the "Don’t know/Not Sure" with "Refused" to make them 'Unkown'. For exercise, we decided to delete entries with "Don’t know/Not Sure" with "Refused" since this is our primary interested independent variable. As for mental health column, we filtered out all entries that in between 1-30, which are useful answers.
+For gender, diabetes, arthritis and persdoc, we collappsed the "Don’t know/Not Sure" with "Refused" to make them 'Unknown'. For exercise, we decided to delete entries with "Don’t know/Not Sure" with "Refused" since this is our primary interested independent variable. As for mental health column, we filtered out all entries that in between 1-30, which are useful answers.
 
 ```{r}
 q1_clean = q1%>%
@@ -176,7 +176,7 @@ ggplot(q1_clean,aes(x=mental, fill=exercise)) +
   labs(x="Mental", y="Density",fill = 'excercise') + 
   theme_bw()
 ```
-Based on the two boxplots, we can see that for people who do participated in any physical activities during the past month, they tend to have lower amount of days during the past 30 days mental health was not good than those who didn't.
+Based on the two plots, we can see that for people who do participated in any physical activities during the past month, they tend to have lower amount of days during the past 30 days mental health was not good than those who didn't.
 
 ```{r}
 # Boxplot (Figure Xc)
@@ -191,14 +191,14 @@ ggplot(q1_clean,aes(x=mental, fill=persdoc)) +
   labs(x="Number of Days Dring the past 30 Days Mental Health was not Good", y="Density") + 
   theme_bw()
 ```
-From the plots above, people who have only one personal health care provider seems to have better mental health. But the distributions of more than one personal health care provider and no personal health care provider are the same. For the Unknown personal health care provider group, the range is significantly larger with a higher median. 
+From the plots above, people who have only one personal health care provider seems to have better mental health. But the distributions of more than one personal health care provider and no personal health care provider are the same. For the Unknown personal health care provider group, the range is significantly larger with a higher median. It seems that there is no obvious differences in mental health condition for people with different number of personal health care provider.
 
 ```{r echo = FALSE,fig.cap="Table 1. Smoke vs. Other variables"}
 table1(~ mental + age + gender + persdoc + exercise |asthma, data=q1_clean)
 ```
 
 ```{r echo = FALSE}
-table1(~ mental + age + gender + persdoc + exercise |asthma, data=q1_clean)
+table1(~ mental + age + gender + persdoc + exercise |diabetes, data=q1_clean)
 ```
 
 
@@ -310,16 +310,23 @@ In this sample, white people account for the largest proportions which indicates
 ```{r, include = FALSE}
 p1 = ggplot(q2_clean,aes(x=mental, fill=diabetes,group = diabetes)) + 
   geom_density(bw=5, alpha=0.5) +
-  labs(x="Days Mental Health was not Good", y="Density",fill = 'diabetes') + 
+  labs(x="Days Mental Health was not Good", y="Density",fill = 'diabetes') +
   theme_bw()
 p1
+```
+
+In this plot, we can tell when the days mental health was not good reach 30, people who are pre-diabetes or borderline diabetes is the largest proportion. In addition, people who get diabetes is the second largest group.
+
+```{r, include = FALSE}
 p2 = ggplot(q2_clean,aes(x=physical_health, fill=diabetes,group = diabetes)) + 
   geom_density(bw=5, alpha=0.5) +
   labs(x="Days Physical Health was not Good", y="Density",fill = 'diabetes') + 
   theme_bw()
+
 p2
 ```
 
+In this plot, we can tell when the days physical health was not good reach 30, people who have diabetes accounted for the largest proportion. People who are pre-diabetes or borderline diabetes accounted for the second largest group.
 
 ```{r}
 table1(~ physical_health +mental + poor_health + general_health |diabetes, data=q2_clean)
