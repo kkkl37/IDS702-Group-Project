@@ -1,0 +1,400 @@
+---
+title: "Group Project"
+author: "Ruixin Lou, Chloe Liu, Paul McKee, Kristi Van Meter"
+date: "`r Sys.Date()`"
+header-includes:
+   - \usepackage{dcolumn}
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    self_contained: yes
+    code_folding: hide
+    code_download: yes
+    toc: yes
+    toc_float: yes
+    number_sections: yes
+---
+
+```{r global options, include = FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE,include = FALSE)
+```
+
+```{r}
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(janitor)
+library(kableExtra)
+library(gridExtra)
+library(equatiomatic)
+library(ggfortify)
+library(stargazer)
+library(caret)
+library(table1)
+library(ggcorrplot)
+```
+
+```{r setup, include=FALSE}
+data = read_xpt('LLCP2021.XPT ')
+```
+
+
+\newpage
+
+
+## Research Question 1: How do exercise habits and medical history predict the number of days mental health was not good in the past 30 days?
+
+For research question one, we decided to perform poisson regression to predict mental health. We have included age, sex, personal health care provider, exercise, arthritis, diabetes, asthma, bp_high,physical health, cholesterol,kidney as independent variables.
+
+```{r}
+q1 = data%>%select('_AGE80',BIRTHSEX,PERSDOC3,EXERANY2,HAVARTH5,DIABETE4,ASTHMA3,BPHIGH6,PHYSHLTH,TOLDHI3,CHCKDNY2,MENTHLTH)
+```
+
+**Rename Columns**
+
+```{r}
+old_names = colnames(q1)
+new_names = c("age","gender","persdoc","exercise","arthritis","diabetes","asthma","bp_high",'physical','cholesterol','kidney',"mental")
+# overwrite the old names with the new names:
+colnames(q1) = new_names
+questions = c("Imputed Age value collapsed above 80","What was your sex at birth? Was it male or female?","Do you have one person (or a group of doctors) that you think of as your personal health care provider?","During the past month, other than your regular job, did you participate in any physical activities or exercises
+such as running, calisthenics, golf, gardening, or walking for exercise?","Has a doctor, nurse or other health professional ever told you that you had some form of arthritis, rheumatoid arthritis, gout, lupus, or fibromyalgia? (Arthritis diagnoses include: rheumatism, polymyalgia rheumatic, osteoarthritis (not osteoporosis), tendonitis, bursitis, bunion, tennis elbow, carpal tunnel syndrome, tarsal tunnel syndrome, joint infection, Reiter’s syndrome, ankylosing spondylitis;)","(Ever told) (you had) diabetes? (If ´Yes´ and respondent is female, ask ´Was this only when you were pregnant?´. If Respondent says pre-diabetes or borderline diabetes, use response code 4.) ","(Ever told) (you had) asthma?","Ever Told Blood Pressure High?",'Number of Days Physical Health Not Good','Ever Told Cholesterol Is High?','Ever Told Have Kidney Disease?',"Now thinking about your mental health, which includes stress, depression, and problems with emotions, for how many days during the past 30 days was your mental health not good?")
+name_combo = bind_cols(New = new_names, Old = old_names,Questions = questions)
+name_combo %>% gt::gt()%>% gt::gtsave("tab_1.png", expand = 10)
+```
+
+
+### Data Cleaning
+
+- For mental health and physical health columns, we filtered out all entries that in between 1-30, which are useful answers.
+- For high blood pressure and diabetes, these two variables have two special values that specified "yes, but only during pregnancy" and "no, pre-diabetes/high blood pressure or borderline diabetes/high blood pressure. For the convenience of interpretation, we decided to collapse them into "yes" and "no" separately. 
+- For arthritis, persdoc, gender, asthma, bp_high, cholesterol and kidney, we decided to delete entries with "Don’t know/Not Sure" with "Refused".
+- All entries with N/A in our primary interest columns has been deleted.
+
+```{r}
+q1_clean = q1%>%
+  mutate(
+    diabetes = case_when(
+      diabetes == 2 ~ 1,
+      diabetes == 4 ~ 3,
+      TRUE ~ diabetes
+    ),
+    bp_high  = case_when(
+      bp_high == 2 ~ 1,
+      bp_high == 4 ~ 3,
+      TRUE ~ bp_high
+    )
+  )%>%
+  filter(mental <= 30 & exercise<=2 & physical <= 30 & cholesterol<=2 & kidney <= 2 & gender <=2 & arthritis<=2 & diabetes<=3 & asthma <=2 & bp_high<=3 & persdoc<=3)
+```
+
+
+
+```{r}
+q1_clean$gender <- factor(q1_clean$gender,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Male','Female') #give it new names
+)
+
+q1_clean$persdoc <- factor(q1_clean$persdoc,
+                        levels=c(1,2,3), #how it is coded in the current dataset
+                        labels = c('only one','More than one','No') #give it new names
+) 
+
+q1_clean$exercise <- factor(q1_clean$exercise,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+)
+
+q1_clean$arthritis <- factor(q1_clean$arthritis,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+
+q1_clean$diabetes <- factor(q1_clean$diabetes,
+                        levels=c(1,3), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+
+q1_clean$asthma <- factor(q1_clean$asthma,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+
+q1_clean$bp_high <- factor(q1_clean$bp_high,
+                        levels=c(1,3), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+
+q1_clean$cholesterol <- factor(q1_clean$cholesterol,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+
+q1_clean$kidney <- factor(q1_clean$kidney,
+                        levels=c(1,2), #how it is coded in the current dataset
+                        labels = c('Yes','No') #give it new names
+) 
+```
+
+```{r}
+q1_clean = q1_clean%>%
+  drop_na()
+```
+
+After data cleaning, we have 14280 observations left. Even though we have deleted a large amount of data entries, we still have a relatively large sample size, which wouldn't be a big concern when perform modelling.
+
+### EDA
+
+```{r}
+# table1(~ mental + age + physical, data=q1_clean)
+```
+
+```{r echo = FALSE,fig.height= 2,include=TRUE}
+disease_toplot = q1_clean%>%
+  dplyr::select(mental,age,physical)
+
+par(mfrow = c(1, 3))
+for (i in 1:ncol(disease_toplot)){
+  data = as.numeric(unlist(disease_toplot[, i]))
+  column_name = colnames(disease_toplot)[i]
+  hist(data, col = "Steelblue",
+       xlab = paste(column_name), ylab = "Count",
+       main = paste(column_name," histogram"))
+}
+```
+
+Generally speaking, most of people experience less than or equal to 10 bad mental health days and bad physical days during the past 30 days. There is an interesting trend that it seems that people are intend to choose days which is divisible by 5. This is especially obvious when they report days greater than 10 days. It is noteworthy that we can observe a significantly high frequency of 30 days, which means there are a significant amount of people whose mental health or physical health was not good for the whole month.
+
+The age distribution of our cleaned data is left skewed, the mean age is greater than the median age.
+
+
+```{r fig.height= 2,fig.width=10,include=TRUE}
+# Boxplot (Figure Xc)
+p1 = ggplot(q1_clean, aes(x=gender, y=mental, fill=gender)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="Gender", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p2 = ggplot(q1_clean,aes(x=mental, fill=gender)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw() 
+
+p3 = ggplot(q1_clean, aes(x=exercise, y=mental, fill=exercise)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="Exercise", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p4 = ggplot(q1_clean,aes(x=mental, fill=exercise)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density",fill = 'excercise') + 
+#   theme_bw()
+
+p5 = ggplot(q1_clean, aes(x=persdoc, y=mental, fill=persdoc)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x=" Personal Health Care Provider", y="Mental Health")+
+  scale_x_discrete(labels=c("only one" = "1", "More than one" = ">1","No" = "0"))
+
+#Density plot (Figure Xd)
+# p6 = ggplot(q1_clean,aes(x=mental, fill=persdoc)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw()
+
+# grid.arrange(p1, p2,p3,p4,p5,p6, ncol=6)
+grid.arrange(p1,p3,p5,ncol=3)
+```
+
+The difference of mental health between gender seems minor. The distribution of number of days dring the past 30 days mental health between gender groups seems basically equal.
+
+Based on the two boxplots, we can see that for people who do participated in any physical activities during the past month, they tend to have lower amount of days during the past 30 days mental health was not good than those who didn't.
+
+From the plots above, people who have only one personal health care provider seems to have better mental health with a smaller median. Whereas the median of more than one personal health care provider and no personal health care provider are close but people who no personal health care provider has a larger range in number of days that mental health not good. 
+
+```{r fig.height= 2,fig.width=10,include=TRUE}
+
+p1 = ggplot(q1_clean, aes(x=arthritis, y=mental, fill=arthritis)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="arthritis", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p2 = ggplot(q1_clean,aes(x=mental, fill=arthritis)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw() 
+
+p3 = ggplot(q1_clean, aes(x=diabetes, y=mental, fill=diabetes)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="diabetes", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p4 = ggplot(q1_clean,aes(x=mental, fill=diabetes)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density",fill = 'excercise') + 
+#   theme_bw()
+
+p5 = ggplot(q1_clean, aes(x=asthma, y=mental, fill=asthma)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="asthma", y="Mental Health")
+#Density plot (Figure Xd)
+# p6 = ggplot(q1_clean,aes(x=mental, fill=asthma)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw()
+
+grid.arrange(p1,p3,p5,ncol=3)
+```
+
+
+```{r fig.height= 2,fig.width=10}
+
+p1 = ggplot(q1_clean, aes(x=bp_high, y=mental, fill=bp_high)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="bp_high", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p2 = ggplot(q1_clean,aes(x=mental, fill=bp_high)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw() 
+
+p3 = ggplot(q1_clean, aes(x=cholesterol, y=mental, fill=cholesterol)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="cholesterol", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p4 = ggplot(q1_clean,aes(x=mental, fill=cholesterol)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density",fill = 'excercise') + 
+#   theme_bw()
+
+p5 = ggplot(q1_clean, aes(x=kidney, y=mental, fill=kidney)) +
+  geom_boxplot()+
+    theme_bw() + 
+  labs (x="kidney", y="Mental Health")
+
+#Density plot (Figure Xd)
+# p6 = ggplot(q1_clean,aes(x=mental, fill=kidney)) + 
+#   geom_density(bw=5, alpha=0.5) +
+#   labs(x="Mental Health", y="Density") + 
+#   theme_bw()
+
+grid.arrange(p1,p3,p5,ncol=3)
+```
+
+Overall, for people who suffered from diseases, we can witness a significantly worse mental health (more days that mental health is not good) comparing with people without those diseases.
+
+### Model
+
+We used poisson regression model to regress our outcome variable - number of days during the last 30 days that mental health not good. Poisson regression is a generalized linear model form of regression analysis used to model count data.Poisson regression assumes the response variable has a Poisson distribution, and assumes the logarithm of its expected value can be modeled by a linear combination of unknown parameters. Here we have response variable as day counts with given period - past 30 days, poisson regression is a good fit for this model.
+
+```{r}
+model = glm(mental ~ .,data = q1_clean,family = poisson)
+```
+
+```{r}
+model2 = glm(mental ~ (.)^2,data = q1_clean,family = poisson)
+```
+
+```{r echo = FALSE}
+# M1 = step(model2, 
+#          direction = "backward", 
+#          trace = FALSE)
+#round(summary(M1)$coef,2)
+```
+
+```{r}
+model3 = glm(mental ~ age + gender + persdoc + exercise + arthritis + diabetes + 
+    asthma + bp_high + physical + cholesterol + kidney + age * 
+    gender + age * physical + gender * diabetes + gender * physical + 
+    gender * cholesterol + exercise * physical + arthritis * 
+    physical + diabetes * physical,data = q1_clean,family = poisson)
+```
+
+
+```{r echo = FALSE,include = FALSE}
+drop1(model3, test = "F")
+```
+
+
+```{r echo = FALSE,results='asis',warning = FALSE,include=TRUE}
+stargazer(model3,title="log expected counts", align=TRUE,header = FALSE,ci = TRUE,digits = 2,single.row = TRUE,type = 'latex')
+```
+
+
+```{r echo = FALSE,warning=FALSE, message=FALSE,include=TRUE}
+knitr::kable(cbind(exp(coef(model3)),exp(confint(model3)),summary(model3)$coefficient[,4]),digits = 2,caption = 'expected counts',col.names = c("coefficient",
+                           "2.5%",
+                           "97.5%",
+                           "p value"))%>% kable_styling(position="center",full_width = FALSE)
+```
+
+
+```{r}
+# extract_eq(model3,wrap = TRUE,use_coefs = TRUE,coef_digits = 5,terms_per_line = 2)
+```
+
+
+$$
+\begin{aligned}
+\log ( { \operatorname{mental})}  &= 2.69175 + 0.29294(\operatorname{gender}_{\operatorname{Female}})\ + \\
+&\quad 0.008(\operatorname{persdoc}_{\operatorname{More\ than\ one}}) + 0.13789(\operatorname{persdoc}_{\operatorname{No}})\ + \\
+&\quad 0.23223(\operatorname{exercise}_{\operatorname{No}}) - 0.13546(\operatorname{arthritis}_{\operatorname{No}})\ - \\
+&\quad 0.10545(\operatorname{diabetes}_{\operatorname{No}}) - 0.07673(\operatorname{asthma}_{\operatorname{No}})\ - \\
+&\quad 0.05874(\operatorname{bp\_high}_{\operatorname{No}}) - 0.01505(\operatorname{cholesterol}_{\operatorname{No}})\ + \\
+&\quad 0.01497(\operatorname{kidney}_{\operatorname{No}}) - 0.00892(\operatorname{age})\ + \\
+&\quad 0.01733(\operatorname{physical}) - 0.00413(\operatorname{gender}_{\operatorname{age}} \times \operatorname{age}_{\operatorname{genderFemale}})\ + \\
+&\quad 0.00019(\operatorname{age} \times \operatorname{physical}) + 0.05653(\operatorname{gender}_{\operatorname{Female}} \times \operatorname{diabetes}_{\operatorname{No}})\ - \\
+&\quad 0.00462(\operatorname{gender}_{\operatorname{Female}} \times \operatorname{physical}) - 0.05568(\operatorname{gender}_{\operatorname{Female}} \times \operatorname{cholesterol}_{\operatorname{No}})\ - \\
+&\quad 0.00499(\operatorname{exercise}_{\operatorname{No}} \times \operatorname{physical}) + 0.0049(\operatorname{arthritis}_{\operatorname{No}} \times \operatorname{physical})\ + \\
+&\quad 0.00431(\operatorname{diabetes}_{\operatorname{No}} \times \operatorname{physical}) + \epsilon
+\end{aligned}
+$$
+
+### Assumption Checking
+
+The poisson model assumes that the mean and variance are equal. That is, as the mean number of counts grows, do does the variance. 
+
+```{r include = FALSE}
+library(AER)
+dispersiontest(model3)
+```
+
+The p-value of overdispersion test is 2.2e-16, which is smaller than 0.05. This means there is evidence of overdispersion.
+
+
+### Model Evaluation
+
+**Multicollinearity**
+```{r include = FALSE}
+library(car)
+vif(model)
+```
+
+After checking with vif of the predictors, we have checked that all GVIF is below 2 and this means there would be multicollinearity issues.
+
+**Residuals and Predictions**
+
+```{r include=TRUE,fig.height=2}
+#residuals and predictions
+resid <- resid(model3, type = "pearson")
+pred <- predict(model3,type="response")
+
+#residuals vs fitted
+qplot(y=resid, x=pred, geom="point",
+      xlab = "Predicted Counts", ylab = "Pearson Residuals")
+```
+The residual plot here has a minor pattern, with lower predicted counts have larger residuals and higher predicted counts have smaller residuals. But overall speaking, this is not a big concern.
+
+
