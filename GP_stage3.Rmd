@@ -62,23 +62,10 @@ This report uses data provided by the Behavioral Risk Factor Surveillance System
 
 #### Methods
 
-The first step taken to answer this first research question was to select only a subset of the features that were relevant as suggested by previous research and theory. The features selected were as follows (question, original name, new name given to make data more wieldy).
+The first step taken to answer this first research question was to select only a subset of the features that were relevant as suggested by previous research and theory. The features selected were as follows.
 
-Predictors:
-
-- Imputed age value collapsed above 80, _AGE80, age 
-- Sex at birth, BIRTHSEX, gender
-- One or more group of doctors thought as personal health care provider, PERSDOC3, persdoc
-- In past month, outside of work, any physical activity/exercise, EXERANY2, exercise
-- Health care provider ever told arthritis diagnosis, HAVARTH5, arthritis
-- Health care provider ever told diabetes diagnosis (if female, during pregnancy), - DIABETE4, diabetes
-- Health care provider ever told asthma diagnosis, ASTHMA3, asthma
-- Health care provider ever told high blood pressure diagnosis, BPHIGH6, bp_high
-- Number of days in past 30 days physical health not good, PHYSHLTH, physical
-- Health care provider ever told high cholesterol diagnosis, TOLDHI3, cholesterol
-- Health care provider ever told kidney disease diagnosis, CHCKDNY2, kidney
-Outcome:
-- Number of days in past 30 days mental health not good, MENTHLTH, mental
+Predictors: Age, Gender,Number of Personal Health Care Provider, Exercise, Arthritis, Diabetes, Asthma, Blood Pressure, Number of Days Physical Health not Good, High Cholesterol, Kidney
+Outcome: Number of Days in Past 30 Days Mental Health not Good
 
 
 ```{r}
@@ -99,7 +86,7 @@ name_combo %>% gt::gt()%>% gt::gtsave("tab_1.png", expand = 10)
 
 ##### Data Cleaning
 
-For physical and mental health features, all reported data that was larger than ‘31’ was removed. For high blood pressure and diabetes features, “yes, but only during pregnancy” and “no, pre-diabetes/high blood pressure or borderline diabetes/high blood pressure” were collapsed in binary “yes” and “no” respectively. For arthritis, persdoc, gender, asthma, bp_high, cholesterol, and kidney features “Don’t know/Not sure” responses were treated as missing data. Any data entry with missing values in any of the relevant features were excluded from analyses. This cleaning phase brought the sample down to N = 14,280. With this sample size, we are sufficiently powered to answer this question so it is not a concern.
+For physical and mental health features, all reported data that was larger than 30 was removed. For high blood pressure and diabetes features, "yes, but only during pregnancy" and “no, pre-diabetes/high blood pressure or borderline diabetes/high blood pressure” were collapsed in binary "yes" and "no" respectively. For arthritis, persdoc, gender, asthma, bp_high, cholesterol, and kidney features "Don’t know/Not sure" responses were treated as missing data. Any data entry with missing values in any of the relevant features were excluded from analyses. This cleaning phase brought the sample down to N = 79520. With this sample size, we are sufficiently powered to answer this question so it is not a concern.
 
 
 ```{r}
@@ -181,19 +168,15 @@ q1_clean = q1_clean%>%
   drop_na()
 ```
 
-After data cleaning, we have 79520 observations left. Even though we have deleted a large amount of data entries, we still have a relatively large sample size, which wouldn't be a big concern when perform modelling.
-
 ##### Modeling
 
-A Poisson Regression Model (PRM) was used to regress our outcome variable of interest on the predictor variables listed above. PRM is the appropriate generalized linear model (GLM) to model count data. PRM models this data by assuming 1) the outcome variable has a Poisson distribution and 2) the logarithm of the outcome’s expected value can be adequately modeled by a linear combination of unknown parameters. Thus, as our outcome counts the number of poor mental health days in a given 30 day period, it is best modeled under this approach and assumptions. All of the aforementioned predictor variables were entered into the model at the same time to predict the logarithm of mental. Meanwhile, we also have included all the interaction terms and used backward selection using AIC as criteria to select significant interaction terms. Two way interactions were included for age x gender, age x physical, gender x diabetes, gender x physical, gender x cholesterol, exercise x physical, arthritis x physical, and diabetes x physical. No other transformations were made.
-
+A Poisson Regression Model (PRM) was used to regress our outcome variable of interest on the predictor variables listed above. PRM is the appropriate generalized linear model (GLM) to model count data. PRM models this data by assuming 1) the outcome variable has a Poisson distribution and 2) the logarithm of the outcome’s expected value can be adequately modeled by a linear combination of unknown parameters. Thus, as our outcome counts the number of poor mental health days in a given 30 day period, it is best modeled under this approach and assumptions. All of the aforementioned predictor variables were entered into the model at the same time to predict the logarithm of mental. Meanwhile, we also have included all the interaction terms and used backward selection using AIC as criteria to select significant interaction terms. No other transformations were made.
 
 #### Results
 
 ##### Exploratory Data Analysis (EDA)
 
 Descriptively, most people report experiencing no greater than 10 bad mental or physical health days out of the last 30 days. In line with previous psychological findings, most people report bad day totals that are divisible by 5. This is even more apparent when looking at the people that report greater than 10 bad days (Figure 1 left and right panel). Interestingly, there is a meaningful subsample of people who report having a total of 30 out of 30 days of poor mental or physical health. Age is relatively uniformly distributed with a slight negative skew (Figure 1 middle panel).
-
 
 ```{r echo = FALSE,fig.height= 2,include=TRUE,fig.width= 10, fig.cap="Histogram of Mental Health, Age and Physical Health"}
 disease_toplot = q1_clean%>%
@@ -244,13 +227,7 @@ p6 = ggplot(q1_clean,aes(x=mental, fill=persdoc)) +
   theme_bw()
 
 # grid.arrange(p1, p2,p3,p4,p5,p6, ncol=6)
-grid.arrange(p1,p3,p5,ncol=3)
-```
 
-```{r fig.height= 2,fig.width=10,include=TRUE,fig.cap="Box plots of Mental Health v.s. Gneder, Exercise and Number of Personal Health Provider"}
-# Boxplot (Figure Xc)
-
-#Density plot (Figure Xd)
 p2 = ggplot(q1_clean,aes(x=mental, fill=gender)) +
   geom_density(bw=5, alpha=0.5) +
   labs(x="Mental Health", y="Density") +
@@ -265,22 +242,12 @@ p6 = ggplot(q1_clean,aes(x=mental, fill=persdoc)) +
   geom_density(bw=5, alpha=0.5) +
   labs(x="Mental Health", y="Density") +
   theme_bw()
-
+grid.arrange(p1,p3,p5,ncol=3)
 grid.arrange(p2,p4,p6, ncol=3)
-# grid.arrange(p1,p3,p5,ncol=3)
 ```
 
-```{r echo = FALSE,include=TRUE}
-table1(~ mental| gender, data=q1_clean)
-```
-```{r echo = FALSE,include=TRUE}
-table1(~ mental| exercise, data=q1_clean)
-```
-```{r echo = FALSE,include=TRUE}
-table1(~ mental| persdoc, data=q1_clean)
-```
 
-Descriptively, there does not appear to be a difference in the number of poor mental health days between male and females - the median is 10 for both (Figure 2 left panel). Of note, upon visual inspection, it appears that those that have not exercised in the past month report a greater number of poor mental health days (Figure 2 middle panel). From the right panel of Figure 2 we can observe that those with one personal health care provider report less poor mental health days than those with multiple personal health care providers or none at all, in that order. 
+Descriptively, there is a difference in the number of poor mental health days between male and females, with female has a larger range of unhappy days, even though the median is 0 for both (Figure 2 left panel). Of note, upon visual inspection, it appears that those that have not exercised in the past month report a greater number of poor mental health days (Figure 2 middle panel). From the right panel of Figure 2 we can observe that those with one personal health care provider report less poor mental health days than those with multiple personal health care providers or none at all, in that order. 
 
 
 ```{r fig.height= 2,fig.width=10,include=TRUE,fig.cap="Box plots of Mental Health vs. Arthritis, Diabetes and Asthma"}
@@ -324,80 +291,6 @@ p6 = ggplot(q1_clean,aes(x=mental, fill=asthma)) +
 grid.arrange(p2,p4,p6, ncol=3)
 # grid.arrange(p1,p3,p5,ncol=3)
 ```
-
-```{r echo = FALSE,include=TRUE}
-table1(~ mental| arthritis, data=q1_clean)
-table1(~ mental| diabetes, data=q1_clean)
-table1(~ mental| asthma, data=q1_clean)
-```
-
-```{r fig.height= 2,fig.width=10,fig.cap="Box plots of Mental Health vs. High Blood Pressure, High Cholesterol and Kidney Disease"}
-
-p1 = ggplot(q1_clean, aes(x=bp_high, y=mental, fill=bp_high)) +
-  geom_boxplot()+
-    theme_bw() + 
-  labs (x="bp_high", y="Mental Health")
-
-#Density plot (Figure Xd)
-# p2 = ggplot(q1_clean,aes(x=mental, fill=bp_high)) + 
-#   geom_density(bw=5, alpha=0.5) +
-#   labs(x="Mental Health", y="Density") + 
-#   theme_bw() 
-
-p3 = ggplot(q1_clean, aes(x=cholesterol, y=mental, fill=cholesterol)) +
-  geom_boxplot()+
-    theme_bw() + 
-  labs (x="cholesterol", y="Mental Health")
-
-#Density plot (Figure Xd)
-# p4 = ggplot(q1_clean,aes(x=mental, fill=cholesterol)) + 
-#   geom_density(bw=5, alpha=0.5) +
-#   labs(x="Mental Health", y="Density",fill = 'excercise') + 
-#   theme_bw()
-
-p5 = ggplot(q1_clean, aes(x=kidney, y=mental, fill=kidney)) +
-  geom_boxplot()+
-    theme_bw() + 
-  labs (x="kidney", y="Mental Health")
-
-#Density plot (Figure Xd)
-# p6 = ggplot(q1_clean,aes(x=mental, fill=kidney)) + 
-#   geom_density(bw=5, alpha=0.5) +
-#   labs(x="Mental Health", y="Density") + 
-#   theme_bw()
-
-grid.arrange(p1,p3,p5,ncol=3)
-```
-
-```{r fig.height= 2,fig.width=10,fig.cap="Box plots of Mental Health vs. High Blood Pressure, High Cholesterol and Kidney Disease"}
-
-#Density plot (Figure Xd)
-p2 = ggplot(q1_clean,aes(x=mental, fill=bp_high)) +
-  geom_density(bw=5, alpha=0.5) +
-  labs(x="Mental Health", y="Density") +
-  theme_bw()
-
-#Density plot (Figure Xd)
-p4 = ggplot(q1_clean,aes(x=mental, fill=cholesterol)) +
-  geom_density(bw=5, alpha=0.5) +
-  labs(x="Mental Health", y="Density") +
-  theme_bw()
-
-#Density plot (Figure Xd)
-p6 = ggplot(q1_clean,aes(x=mental, fill=kidney)) +
-  geom_density(bw=5, alpha=0.5) +
-  labs(x="Mental Health", y="Density") +
-  theme_bw()
-
-grid.arrange(p2,p4,p6,ncol=3)
-```
-
-```{r include=TRUE}
-table1(~ mental| bp_high, data=q1_clean)
-table1(~ mental| cholesterol, data=q1_clean)
-table1(~ mental| kidney, data=q1_clean)
-```
-
 
 Not surprisingly, those who suffered from arthritis (Figure 3 left panel), diabetes (middle panel), or asthma (right panel) reported greater numbers of poor mental health days compared to those who did not experience those diseases.
 
@@ -465,9 +358,11 @@ $$
 \end{aligned}
 $$
 
-Our model indicated relationships for all our predictor variables on the log counts of poor mental health days except for persdoc (more than one vs one), kidney, and cholesterol. We could not reject the null hypothesis for persdoc (more than one vs one) (b = 0.01, p > 0.05, 95% CI [-0.002, 0.02]), kidney (b = 0.01, p > 0.05, 95% CI [-0.003, 0.03]), or cholesterol (b = -0.02, p > 0.05, 95% CI [-0.03, 0.002]). See Table 1 below for full results.
-	The predictors with the largest relationships with number of poor mental health days include gender (b = 0.29, p < 0.01, 95% CI [0.25, 0.34]), exercise (b = 0.23, p < 0.01, 95% CI [0.21, 0.25]), persdoc (no vs one) (b = 0.14, p < 0.01, 95% CI [0.12, 0.16]), arthritis (b = -0.14, p < 0.01, 95% CI [-0.15, -0.12]), and diabetes (b = -0.11, p < 0.01, 95% CI [-0.13, -0.08]). 
-	Being a female is associated with having 1.34 times more poor mental health days compared to being a male. Likewise, not exercising is associated with having 1.26 times more poor mental health days compared to those that exercise. In a similar direction, having no personal health care provider is associated with 1.15 times more poor mental health days compared to people that have exactly one. Not having arthritis or diabetes are protective factors that are associated with a reduction of 13% and 10% in the number of poor mental health days, respectively, compared to people with arthritis or diabetes.
+Our model indicated relationships for all our predictor variables on the log counts of poor mental health days except for gender x persdoc (no vs one). We could not reject the null hypothesis for gender x persdoc (no vs one) (b = 0.01, p > 0.05, 95% CI [-0.01, 0.04]). See Table 1 below for full results.
+
+The predictors with the largest relationships with number of poor mental health days include gender (b = 0.43, p < 0.01, 95% CI [0.41, 0.44]), arthritis (b = -0.32, p < 0.01, 95% CI [-0.35, -0.29]), high blood pressure (b = -0.30, p < 0.01, 95% CI [-0.33, -0.26]), high cholesterol (b = -0.27, p < 0.01, 95% CI [-0.29, -0.25]), kidney (b = -0.24, p < 0.01, 95% CI [-0.26, -0.21]), persdoc x exercise (b = -0.23, p < 0.01, 95% CI [-0.25, -0.20]), exercise (b = 0.15, p < 0.01, 95% CI [0.11, 0.19]), arthritis x asthma (b = -0.14, p < 0.01, 95% CI [-0.16, -0.12]), diabetes x high blood pressure (b = -0.14, p < 0.01, 95% CI [-0.16, -0.12]), persdoc (more than one vs one) (b = 0.12, p < 0.01, 95% CI [0.08, 0.15]) and asthma (b = -0.10, p < 0.01, 95% CI [-0.13, -0.06]). 
+
+Being a female is associated with having 1.34 times more poor mental health days compared to being a male. Likewise, not exercising is associated with having 1.26 times more poor mental health days compared to those that exercise. In a similar direction, having no personal health care provider is associated with 1.15 times more poor mental health days compared to people that have exactly one. Not having arthritis or diabetes are protective factors that are associated with a reduction of 13% and 10% in the number of poor mental health days, respectively, compared to people with arthritis or diabetes.
 
 
 ##### Model Evaluation
@@ -485,17 +380,6 @@ vif = vif(model3)
 ```
 
 Computing the VIF for all predictors, we find that all the predictors are above the threshold that indicate no multicollinearity (e.g., 1). However, since most of $GVIF^(1/(2*Df))$ values remain below 5, only exercise has a VIF slightly greater than 5, there is not a major concern that multicollinearity will introduce any meaningful issues in our data analysis and inference. 
-
-```{r echo = FALSE,warning=FALSE, message=FALSE,include=TRUE}
-knitr::kable(cbind(vif[,3]),digits = 2,caption = '$GVIF^{(1/(2*Df))}$')%>% kable_styling(position="center",full_width = FALSE)
-```
-
-
-```{r include = FALSE}
-# library(AER)
-# dispersiontest(model3)
-```
-
 
 **Residuals and Predictions**
 
@@ -540,9 +424,6 @@ anova(nullmod,model3,test = "Chisq") %>%
 ```
 
 
-```{r}
-anova(model,model3,test = "Chisq")
-```
 
 Comparing with model without any interaction term:
 
@@ -568,24 +449,30 @@ Comparing with both null model and model without any interaction term, both devi
 
 **Outliers**
 
-```{r echo=FALSE}
+```{r echo=FALSE,fig.height=2,fig.width=10}
 q1_clean$cooksD <- cooks.distance(model3)
 plot(q1_clean$cooksD)
 ```
 
+There is no influential points or outliers in our model.
 
 # Conclusion and Limitation
+
+To answer the first research question, "How well do exercise habits and medical history predict the number of poor mental health days during a 30-day period?", we performed Poisson regression on the number of poor mental health days during a 30-day period.
+Based on the model result, exercise indeed has positive effects on mental health, and not having arthritis or diabetes will contribute to decreasing the number of days that mental health is not good. Taylor et al.’s study (1985) provided evidence suggesting that physical activity and exercise can help reduce anxiety symptoms, enhance self-esteem, social skills, and cognitive functioning, and modify coronary-prone behavior and the body's physiological reaction to stress. In terms of diseases, many studies have shown clearly that people with arthritis with the highest pain levels are the most likely to be anxious or depressed, and people with diabetes are 2 to 3 times more likely to have depression than people without diabetes (Centers for Disease Control and Prevention, 2021, Centers for Disease Control and Prevention, 2022). Even though our model shows whether or not having kidney disease or high cholesterol is insignificant, we still cannot conclude that those diseases have no effects on mental health. Since we have deleted a large amount of data entries with "Don’t know/Not Sure", "Refused" and missing values, our study may be subject to non-response bias. Additionally, our Poisson regression failed the overdispersion assumption, which indicates that the resulting model will be less accurate, leading to underestimated (lower than the true value) standard error of parameter estimation and, therefore, invalid conclusions.
+
 
 \newpage
 # Appendix
 
 ```{r echo = FALSE,results='asis',warning = FALSE,include=TRUE}
+# final model result
 stargazer(model3,title="log expected counts", align=TRUE,header = FALSE,ci = TRUE,digits = 2,single.row = TRUE,type = 'latex')
 ```
 
+
+
 ```{r echo = FALSE,warning=FALSE, message=FALSE,include=TRUE}
-# knitr::kable(cbind(exp(coef(model3)),exp(confint(model3)),summary(model3)$coefficient[,4]),digits = 2,caption = 'expected counts',col.names = c("coefficient",
-#                           "2.5%",
-#                           "97.5%",
-#                           "p value"))%>% kable_styling(position="center",full_width = FALSE)
+# vif table
+knitr::kable(cbind(vif[,3]),digits = 2,caption = '$GVIF^{(1/(2*Df))}$')%>% kable_styling(position="center",full_width = FALSE)
 ```
